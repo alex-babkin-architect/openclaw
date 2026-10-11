@@ -338,7 +338,7 @@ describe("memory-core plugin runtime registration", () => {
         }),
       );
 
-      expect(replyHookTriggers, `cycle ${cycle}`).toEqual([["heartbeat", "cron"]]);
+      expect(replyHookTriggers, `cycle ${cycle}`).toEqual([["cron"]]);
     }
   });
 
