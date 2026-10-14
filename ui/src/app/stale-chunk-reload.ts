@@ -140,7 +140,7 @@ export async function scheduleStaleChunkReload(deps: StaleChunkReloadDeps = {}):
   const storageIdentity = storage ?? unavailableStorage;
   let recovery = recoveryByStorage.get(storageIdentity);
   // This document already issued a reload and is being replaced.
-  if (recovery?.buildId === null && now - recovery.attemptedAt < RELOAD_GUARD_WINDOW_MS) {
+  if (recovery?.buildId === null) {
     return false;
   }
   // A generic chunk failure cannot replace the server build already being

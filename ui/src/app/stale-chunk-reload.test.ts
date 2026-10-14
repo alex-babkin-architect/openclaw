@@ -254,16 +254,17 @@ describe("scheduleStaleChunkReload", () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  it("allows another automatic recovery after the loop guard expires", async () => {
+  it("never schedules another automatic reload in a document already being replaced", async () => {
     const reload = vi.fn();
     const storage = memoryStorage();
-    stubDocumentFetch(new Response(null, { status: 200 }), new Response(null, { status: 200 }));
+    const probe = stubDocumentFetch(new Response(null, { status: 200 }));
     await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(true);
     await vi.advanceTimersByTimeAsync(29_999);
     await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(false);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(true);
-    expect(reload).toHaveBeenCalledTimes(2);
+    await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(false);
+    expect(probe).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it("defers recovery in a reloaded document until the loop guard expires", async () => {
