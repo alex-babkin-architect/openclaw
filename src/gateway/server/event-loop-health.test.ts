@@ -33,6 +33,8 @@ type CpuUsage = ReturnType<typeof process.cpuUsage>;
 type EventLoopUtilization = ReturnType<typeof performance.eventLoopUtilization>;
 const monitors: ReturnType<typeof createGatewayEventLoopHealthMonitor>[] = [];
 const nativeDelay = vi.hoisted(() => ({ max: 20_000_000 }));
+// Bun lacks async_hooks Promise before/after callbacks, so only Node counts the synthetic 20 ms step.
+const promiseHookClockStepMs = process.versions.bun ? 0 : 20;
 vi.mock("node:perf_hooks", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:perf_hooks")>()),
   monitorEventLoopDelay: () => ({
@@ -130,9 +132,7 @@ describe("createGatewayEventLoopHealthMonitor", () => {
       delayP99Ms: 0,
       degraded: false,
     });
-    // Promise hooks may observe the synthetic clock step as callback time.
-    expect(idleSample?.delayMaxMs).toBeGreaterThanOrEqual(0);
-    expect(idleSample?.delayMaxMs).toBeLessThanOrEqual(20);
+    expect(idleSample?.delayMaxMs).toBe(promiseHookClockStepMs);
     idle = false;
     await harness.samples(500);
     await harness.samples(50);
@@ -182,9 +182,7 @@ describe("createGatewayEventLoopHealthMonitor", () => {
       degraded: true,
       reasons: ["event_loop_delay"],
     });
-    // The blocking job is 1,200 ms; Promise hooks may also count the 20 ms clock step.
-    expect(stalledSample?.delayMaxMs).toBeGreaterThanOrEqual(1_200);
-    expect(stalledSample?.delayMaxMs).toBeLessThanOrEqual(1_220);
+    expect(stalledSample?.delayMaxMs).toBe(1_200 + promiseHookClockStepMs);
     await harness.samples(50);
     expect(harness.monitor.snapshot()).toMatchObject({ intervalMs: 1_000, degraded: false });
   });
