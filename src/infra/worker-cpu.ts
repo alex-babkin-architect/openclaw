@@ -316,7 +316,7 @@ export function setTrackedWorkerGcObserver(
   if (wasEnabled !== enabled) {
     for (const source of trackedWorkers.workers.values()) {
       if (source.memoryPort) {
-        source.memoryPort.postMessage({ gc: enabled });
+        source.memoryPort.postMessage({ gc: enabled }, []);
         recordWorkerMessage("memory", "to_worker");
       }
     }
