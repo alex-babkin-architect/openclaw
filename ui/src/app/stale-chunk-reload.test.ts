@@ -6,6 +6,7 @@ import { i18n } from "../i18n/index.ts";
 import * as storageAccess from "../local-storage.ts";
 import { registerControlUiReloadGuard } from "./document-reload-guard.ts";
 import {
+  cancelStaleChunkRecovery,
   installMissingStylesheetRecovery,
   installStaleChunkReloadListener,
   isStaleChunkImportError,
@@ -613,6 +614,28 @@ describe("scheduleStaleChunkReload", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(reload).toHaveBeenCalledOnce();
     expect(storage.getItem(GUARD_KEY)).toBe(guard("gateway-target", reloadedAt));
+  });
+
+  it("lets a dismissed surface retire generic recovery but not a Gateway build target", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const reload = vi.fn();
+    const storage = memoryStorage();
+
+    const generic = scheduleStaleChunkReload({ storage, reload });
+    await vi.advanceTimersByTimeAsync(0);
+    cancelStaleChunkRecovery(storage);
+    await expect(generic).resolves.toBe(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(reload).not.toHaveBeenCalled();
+
+    const targeted = scheduleStaleChunkReload({ buildId: "gateway-target", storage, reload });
+    cancelStaleChunkRecovery(storage);
+    await expect(targeted).resolves.toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it("keeps automatic recovery running after a failed manual retry", async () => {

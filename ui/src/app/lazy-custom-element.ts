@@ -1,6 +1,7 @@
 import { t } from "../i18n/index.ts";
 import {
   isStaleChunkImportError,
+  cancelStaleChunkRecovery,
   retryStaleChunkReloadWhenReachable,
 } from "./stale-chunk-reload.ts";
 
@@ -69,6 +70,7 @@ export class LazyCustomElementRequestController {
   private readonly preloads = new Set<string>();
   private active: OptionalCustomElement | undefined;
   private activeDismissed = false;
+  private staleRetry: LazyCustomElementRequest | undefined;
 
   constructor(
     private readonly host: UpdatingHost,
@@ -143,6 +145,7 @@ export class LazyCustomElementRequestController {
       status: "loading",
     } satisfies LazyCustomElementRequest;
     this.current = retryRequest;
+    this.staleRetry = request.stale ? retryRequest : undefined;
     this.host.requestUpdate();
     const canReload = () => this.current === retryRequest;
     void (request.stale ? this.retryStale(canReload) : Promise.resolve(false)).then((reloading) => {
@@ -156,6 +159,13 @@ export class LazyCustomElementRequestController {
     if (this.current) {
       if (this.current.element === this.active) {
         this.activeDismissed = true;
+      }
+      // Dismissing a stale-chunk failure must not reload the page later (#130988).
+      if (
+        (this.current.status === "error" && this.current.stale) ||
+        this.current === this.staleRetry
+      ) {
+        cancelStaleChunkRecovery();
       }
       this.onClose?.();
       this.abandon();

@@ -277,6 +277,19 @@ function waitForRecoverySignal(delayMs: number, signal?: AbortSignal): Promise<v
   });
 }
 
+/**
+ * A dismissed failure surface retires pending recovery for the running build. Gateway
+ * build targets keep theirs, and surfaces still showing a failure re-arm on render.
+ */
+export function cancelStaleChunkRecovery(
+  storage: Pick<Storage, "getItem" | "setItem"> | null = getSafeSessionStorage(),
+): void {
+  const recovery = recoveryByStorage.get(storage ?? unavailableStorage);
+  if (recovery?.pending && recovery.buildId === CONTROL_UI_BUILD_INFO.buildId) {
+    recovery.controller?.abort();
+  }
+}
+
 /** User-initiated retry may bypass the automatic build guard, but never live ownership. */
 export async function retryStaleChunkReloadWhenReachable(
   deps: ReachableReloadDeps = {},
