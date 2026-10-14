@@ -281,9 +281,10 @@ function waitForRecoverySignal(delayMs: number, signal?: AbortSignal): Promise<v
 export async function retryStaleChunkReloadWhenReachable(
   deps: ReachableReloadDeps = {},
 ): Promise<boolean> {
+  // Automatic recovery keeps running: a manual retry during an outage may fail, and a
+  // successful one retires the shared target before the automatic wait can reload.
   const storage = deps.storage === undefined ? getSafeSessionStorage() : deps.storage;
   const storageIdentity = storage ?? unavailableStorage;
-  recoveryByStorage.get(storageIdentity)?.controller?.abort();
   if (
     !(await waitForReachableControlUiDocument(
       deps,

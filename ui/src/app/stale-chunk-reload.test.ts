@@ -533,8 +533,8 @@ describe("scheduleStaleChunkReload", () => {
     });
     sharedProbe.resolve(new Response(null, { status: 200 }));
 
-    await expect(Promise.all([automatic, manual])).resolves.toEqual([false, true]);
-    expect(reload).toHaveBeenCalledTimes(1);
+    await expect(Promise.all([automatic, manual])).resolves.toEqual([true, false]);
+    expect(reload).toHaveBeenCalledExactlyOnceWith("automatic");
     expect(storage.getItem(GUARD_KEY)).toBe(guard("target-build"));
   });
 
@@ -614,28 +614,22 @@ describe("scheduleStaleChunkReload", () => {
     expect(storage.getItem(GUARD_KEY)).toBe(guard("gateway-target", reloadedAt));
   });
 
-  it("stops automatic waiting even when a manual retry fails", async () => {
-    vi.useFakeTimers();
-    const firstProbe = deferred<Response>();
-    const fetchMock = vi.fn<typeof fetch>().mockImplementationOnce(async () => firstProbe.promise);
-    fetchMock.mockResolvedValueOnce(new Response(null, { status: 200 }));
+  it("keeps automatic recovery running after a failed manual retry", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const reload = vi.fn();
     const storage = memoryStorage();
 
     const automatic = scheduleStaleChunkReload({ storage, reload });
     const manual = retryStaleChunkReloadWhenReachable({ reload, storage, timeoutMs: 0 });
-    await Promise.resolve();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    firstProbe.resolve(new Response(null, { status: 503 }));
+    await expect(manual).resolves.toBe(false);
+    expect(reload).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_000);
-    await expect(Promise.all([automatic, manual])).resolves.toEqual([false, false]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(reload).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(reload).not.toHaveBeenCalled();
+    await expect(automatic).resolves.toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
   });
 });
 
