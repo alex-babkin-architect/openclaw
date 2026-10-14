@@ -1,7 +1,7 @@
 import { types } from "node:util";
 import { isMainThread } from "node:worker_threads";
-import { isRecord } from "@openclaw/normalization-core/record-coerce";
-import { resolveGlobalSingleton } from "../shared/global-singleton.js";
+import { isRecord } from "../../packages/normalization-core/src/record-coerce.ts";
+import { resolveGlobalSingleton } from "../shared/global-singleton.ts";
 
 export type WorkerMessageKind =
   | "sqlite_request"
