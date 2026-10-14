@@ -124,12 +124,15 @@ describe("createGatewayEventLoopHealthMonitor", () => {
     expect(harness.monitor.snapshot()).toBe(first);
     expect(harness.cpuUsage).toHaveBeenCalledTimes(reads);
     await harness.sample(1);
-    expect(harness.monitor.snapshot()).toMatchObject({
+    const idleSample = harness.monitor.snapshot();
+    expect(idleSample).toMatchObject({
       intervalMs: 9_000,
       delayP99Ms: 0,
-      delayMaxMs: 20,
       degraded: false,
     });
+    // Promise hooks may observe the synthetic clock step as callback time.
+    expect(idleSample?.delayMaxMs).toBeGreaterThanOrEqual(0);
+    expect(idleSample?.delayMaxMs).toBeLessThanOrEqual(20);
     idle = false;
     await harness.samples(500);
     await harness.samples(50);
@@ -174,11 +177,14 @@ describe("createGatewayEventLoopHealthMonitor", () => {
     });
     await harness.sample();
     await harness.samples(389);
-    expect(harness.monitor.snapshot()).toMatchObject({
+    const stalledSample = harness.monitor.snapshot();
+    expect(stalledSample).toMatchObject({
       degraded: true,
-      delayMaxMs: 1_220,
       reasons: ["event_loop_delay"],
     });
+    // The blocking job is 1,200 ms; Promise hooks may also count the 20 ms clock step.
+    expect(stalledSample?.delayMaxMs).toBeGreaterThanOrEqual(1_200);
+    expect(stalledSample?.delayMaxMs).toBeLessThanOrEqual(1_220);
     await harness.samples(50);
     expect(harness.monitor.snapshot()).toMatchObject({ intervalMs: 1_000, degraded: false });
   });
