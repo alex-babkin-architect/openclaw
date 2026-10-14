@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import { assert, expect, it } from "vitest";
 import { createControlUiE2eArtifactDir } from "../test-helpers/control-ui-e2e-artifacts.ts";
 import { takeControlUiScreenshotFrame } from "../test-helpers/control-ui-e2e-screenshot.ts";
 import { installMockGateway } from "../test-helpers/control-ui-e2e.ts";
@@ -84,11 +85,13 @@ suite.define(() => {
         expect(await resume.count()).toBe(1);
         await resume.click();
         const request = await gateway.waitForRequest(method);
+        assert(isRecord(request.params), "Expected Goal resume request parameters");
         expect(request.params).toMatchObject({
           sessionKey: "agent:main:main",
           sessionId: "goal-checklist-session",
           goalId: goal.id,
           action: "resume",
+          operationId: expect.any(String),
         });
         await card.getByText("Resuming goal…", { exact: true }).waitFor();
         const { completedAt: _completedAt, ...retained } = goal;
