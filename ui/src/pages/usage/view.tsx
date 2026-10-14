@@ -170,11 +170,11 @@ export function renderUsage(props: UsageProps) {
       (props.data.totals?.totalTokens ?? 0) === 0,
   );
   const datePresets = [
-    { label: "usage.presets.today", days: 1 },
-    { label: "usage.presets.last7d", days: 7 },
-    { label: "usage.presets.last30d", days: 30 },
-    { label: "usage.presets.last90d", days: 90 },
-    { label: "usage.presets.last1y", days: 365 },
+    { labelKey: "usage.presets.today", days: 1 },
+    { labelKey: "usage.presets.last7d", days: 7 },
+    { labelKey: "usage.presets.last30d", days: 30 },
+    { labelKey: "usage.presets.last90d", days: 90 },
+    { labelKey: "usage.presets.last1y", days: 365 },
   ];
   const presetRange = (days: number) => {
     const end = new Date();
@@ -239,7 +239,7 @@ export function renderUsage(props: UsageProps) {
                         aria-pressed={isPresetSelected(preset.days) ? "true" : "false"}
                         onClick={() => applyPreset(preset.days)}
                       >
-                        {t(preset.label)}
+                        {t(preset.labelKey)}
                       </button>
                     )}
                   </For>

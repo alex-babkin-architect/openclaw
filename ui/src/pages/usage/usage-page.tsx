@@ -25,10 +25,8 @@ export function UsagePage(props: { routeData?: UsageRouteData }) {
       return () => model.dispose();
     },
   );
-  createEffect(
-    () => props.routeData,
-    (data) => model.setRouteData(data),
-  );
+  const routeData = createMemo(() => props.routeData);
+  createEffect(routeData, (data) => model.setRouteData(data));
   return (
     <openclaw-usage-page>
       <UsagePageContent state={state()} context={context} result={result()} />

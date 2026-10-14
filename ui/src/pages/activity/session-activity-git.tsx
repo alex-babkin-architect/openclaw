@@ -100,23 +100,23 @@ type ActivitySessionGitProps = {
 
 export function ActivitySessionGit(props: ActivitySessionGitProps) {
   const token = {};
-  const initial = untrack(() => ({ gateway: props.context.gateway, key: props.sessionKey ?? "" }));
+  const gateway = createMemo(() => props.context.gateway);
+  const key = createMemo(() => props.sessionKey ?? "");
+  const source = () => ({ gateway: gateway(), key: key() });
+  const initial = untrack(source);
   const gatewayProjection = projectGateway(initial.gateway);
   const projection = projectSource(initial, {
     read: ({ gateway, key }) => sessionPullRequestsForGateway(gateway).get(key),
     subscribe: ({ gateway }, notify) => sessionPullRequestsForGateway(gateway).subscribe(notify),
     equality: "revision",
   });
-  createEffect(
-    () => ({ gateway: props.context.gateway, key: props.sessionKey ?? "" }),
-    ({ gateway, key }) => {
-      gatewayProjection.replaceSource(gateway);
-      projection.replaceSource({ gateway, key });
-      const store = sessionPullRequestsForGateway(gateway);
-      store.watch(token, [key], { foreground: true });
-      return () => store.unwatch(token);
-    },
-  );
+  createEffect(source, ({ gateway, key }) => {
+    gatewayProjection.replaceSource(gateway);
+    projection.replaceSource({ gateway, key });
+    const store = sessionPullRequestsForGateway(gateway);
+    store.watch(token, [key], { foreground: true });
+    return () => store.unwatch(token);
+  });
   const connection = () => gatewayProjection.read().snapshot;
   const snapshot = () => projection.read();
   const branch = createMemo(() => {

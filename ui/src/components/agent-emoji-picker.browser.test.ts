@@ -1,34 +1,19 @@
-import { createComponent, createSignal, flush } from "solid-js";
 import { afterEach, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 import "../test-helpers/load-styles.ts";
-import { cleanupSolid, mountSolid } from "../test-helpers/mount-solid.ts";
-import { AgentEmojiPicker } from "./agent-emoji-picker.tsx";
+import "./agent-emoji-picker.ts";
 
-afterEach(() => {
-  cleanupSolid();
-  document.body.replaceChildren();
-});
+afterEach(() => document.body.replaceChildren());
 
 it("opens above a modal, focuses search, selects and restores its trigger", async () => {
   const dialog = document.createElement("dialog");
+  const picker = document.createElement("openclaw-agent-emoji-picker");
   const onSelect = vi.fn();
-  const [disabled, setDisabled] = createSignal(false);
-  mountSolid(
-    () =>
-      createComponent(AgentEmojiPicker, {
-        value: "",
-        get disabled() {
-          return disabled();
-        },
-        onSelect,
-      }),
-    { container: dialog },
-  );
+  picker.onSelect = onSelect;
+  dialog.append(picker);
   document.body.append(dialog);
   dialog.showModal();
-  flush();
-  const picker = dialog.querySelector("openclaw-agent-emoji-picker")!;
+  await picker.updateComplete;
   const trigger = picker.querySelector<HTMLButtonElement>(".agent-emoji-picker__trigger")!;
   const search = picker.querySelector<HTMLInputElement>(".agent-emoji-picker__search")!;
   const popover = picker.querySelector<HTMLElement>(".agent-emoji-picker__popover")!;
@@ -43,8 +28,8 @@ it("opens above a modal, focuses search, selects and restores its trigger", asyn
   expect(document.activeElement).toBe(trigger);
   await page.elementLocator(trigger).click();
   expect(search.value).toBe("");
-  setDisabled(true);
-  flush();
+  picker.disabled = true;
+  await picker.updateComplete;
   await expect.poll(() => popover.matches(":popover-open")).toBe(false);
   expect(trigger.disabled).toBe(true);
   dialog.close();
