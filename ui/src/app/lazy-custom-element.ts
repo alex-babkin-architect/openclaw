@@ -77,6 +77,7 @@ export class LazyCustomElementRequestController {
     private readonly onClose?: () => void,
     private readonly retryStale = (canReload: () => boolean) =>
       retryStaleChunkReloadWhenReachable({ canReload }),
+    private readonly cancelStale = () => cancelStaleChunkRecovery(),
   ) {}
 
   get visibleState(): LazyCustomElementRequestState | undefined {
@@ -160,13 +161,6 @@ export class LazyCustomElementRequestController {
       if (this.current.element === this.active) {
         this.activeDismissed = true;
       }
-      // Dismissing a stale-chunk failure must not reload the page later (#130988).
-      if (
-        (this.current.status === "error" && this.current.stale) ||
-        this.current === this.staleRetry
-      ) {
-        cancelStaleChunkRecovery();
-      }
       this.onClose?.();
       this.abandon();
     }
@@ -174,6 +168,14 @@ export class LazyCustomElementRequestController {
 
   abandon(): void {
     if (this.current) {
+      // A retired stale-chunk failure must not reload the page later (#130988);
+      // surfaces that still show a failure re-arm recovery when they render.
+      if (
+        (this.current.status === "error" && this.current.stale) ||
+        this.current === this.staleRetry
+      ) {
+        this.cancelStale();
+      }
       this.current = undefined;
       this.host.requestUpdate();
       this.pumpActive();
