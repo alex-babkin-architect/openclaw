@@ -171,10 +171,26 @@ export function inspectScopedMigrationTables(
   }
 }
 
-function copyRows(source: DatabaseSync, query: string, target: DatabaseSync, insert: string): void {
-  const reader = source.prepare(query);
+function copyRows(
+  source: DatabaseSync,
+  query: string,
+  columns: string[],
+  target: DatabaseSync,
+  insert: string,
+): void {
+  // Keep TEXT bytes out of JavaScript string decoding on both capture and restore.
+  const projection = columns.flatMap((column, index) => [
+    `typeof(${quote(column)}) = 'text' AS ${quote(`t${index}`)}`,
+    `CASE WHEN typeof(${quote(column)}) = 'text' THEN CAST(${quote(column)} AS BLOB) ELSE ${quote(column)} END AS ${quote(`v${index}`)}`,
+  ]);
+  const reader = source.prepare(`SELECT ${projection.join(", ")} FROM (${query})`);
   reader.setReadBigInts(true);
-  const writer = target.prepare(insert);
+  const values = columns.map((_, index) => {
+    const text = index * 2 + 1;
+    const value = text + 1;
+    return `CASE WHEN ?${text} THEN CAST(?${value} AS TEXT) ELSE ?${value} END`;
+  });
+  const writer = target.prepare(`${insert} VALUES (${values.join(", ")})`);
   for (const row of reader.iterate()) {
     writer.run(...Object.values(row));
   }
@@ -191,11 +207,13 @@ function restoreRows(
   index: number,
 ): void {
   const columns = [...(table.rowid ? [table.rowid] : []), ...table.columns];
+  const saved = storedColumns(table);
   copyRows(
     archive,
-    `SELECT ${storedColumns(table).map(quote).join(", ")} FROM ${quote(`data_${index}`)}`,
+    `SELECT ${saved.map(quote).join(", ")} FROM ${quote(`data_${index}`)}`,
+    saved,
     target,
-    `INSERT INTO ${quote(table.name)} (${columns.map(quote).join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+    `INSERT INTO ${quote(table.name)} (${columns.map(quote).join(", ")})`,
   );
 }
 
@@ -219,8 +237,10 @@ export async function createScopedMigrationSnapshot(params: {
     try {
       const archive = openNodeSqliteDatabase(stagedPath);
       try {
+        // CAST(BLOB AS TEXT) interprets bytes in the database's encoding.
+        const encoding = String(source.prepare("PRAGMA encoding").get()!.encoding);
         archive.exec(
-          `PRAGMA application_id = ${SCOPED_MIGRATION_APPLICATION_ID}; PRAGMA trusted_schema = OFF;`,
+          `PRAGMA encoding = ${quote(encoding)}; PRAGMA application_id = ${SCOPED_MIGRATION_APPLICATION_ID}; PRAGMA trusted_schema = OFF;`,
         );
         runSqliteReadSnapshotSync(source, () =>
           runSqliteImmediateTransactionSync(archive, () => {
@@ -241,8 +261,9 @@ export async function createScopedMigrationSnapshot(params: {
               copyRows(
                 source,
                 `SELECT ${selected.map((column, position) => `${quote(column)} AS ${quote(columns[position]!)}`).join(", ")} FROM ${quote(table.name)}`,
+                columns,
                 archive,
-                `INSERT INTO ${dataTable} VALUES (${columns.map(() => "?").join(", ")})`,
+                `INSERT INTO ${dataTable}`,
               );
             }
           }),

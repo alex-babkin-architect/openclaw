@@ -30,12 +30,13 @@ function withDatabase<T>(filename: string, operation: (db: DatabaseSync) => T): 
   }
 }
 
-function fixture() {
+function fixture(encoding = "UTF-8") {
   const directory = tempDirs.make("openclaw-scoped-migration-");
   const sourcePath = path.join(directory, "agent.sqlite");
   const backupPath = `${sourcePath}.scoped.bak`;
   withDatabase(sourcePath, (db) => {
     db.exec(`
+      PRAGMA encoding = '${encoding}';
       PRAGMA user_version = 26;
       CREATE TABLE selected (
         id INTEGER PRIMARY KEY,
@@ -101,6 +102,35 @@ function editMetadata(
 }
 
 describe("table-scoped migration snapshots", () => {
+  it.each([
+    { encoding: "UTF-8", malformed: "61FF62", nul: "610062" },
+    { encoding: "UTF-16le", malformed: "610000D86200", nul: "610000006200" },
+  ])(
+    "preserves TEXT bytes during backup and restore with $encoding",
+    async ({ encoding, malformed, nul }) => {
+      const f = fixture(encoding);
+      withDatabase(f.sourcePath, (db) =>
+        db.exec(`INSERT INTO loose(rowid, value) VALUES
+        (914, CAST(X'${malformed}' AS TEXT)), (915, CAST(X'${nul}' AS TEXT))`),
+      );
+      await capture(f);
+      mutate(f);
+      restoreScopedMigrationSnapshot({ ...f, assertCurrent: () => {} });
+      withDatabase(f.sourcePath, (db) => {
+        expect(
+          db
+            .prepare(
+              "SELECT typeof(value) AS type, hex(value) AS bytes FROM loose WHERE rowid >= 914 ORDER BY rowid",
+            )
+            .all(),
+        ).toEqual([
+          { type: "text", bytes: malformed },
+          { type: "text", bytes: nul },
+        ]);
+      });
+    },
+  );
+
   it("restores selected schema, typed rows, rowids and statistics while retaining later writes elsewhere", async () => {
     const f = fixture();
     const statistics = withDatabase(f.sourcePath, (db) =>
