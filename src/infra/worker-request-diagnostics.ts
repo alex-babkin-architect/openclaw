@@ -34,7 +34,6 @@ const sessionCommands = new Set([
   "session.entry.replacements.prepare",
   "session.entry.replacements.commit",
   "session.lifecycle.project",
-  "session.maintenance.read",
   "session.pendingInputs.read",
   "session.pendingInputs.mutate",
   "session.turn.prepare",
