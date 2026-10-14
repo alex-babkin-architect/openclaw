@@ -319,7 +319,9 @@ async function consolidatePacks(
     await requireGit(repoRoot, ["multi-pack-index", "expire"], options);
     const presentAfterExpiry = new Set(await fs.readdir(directory));
     const remainingBatch = selected.filter((name) => presentAfterExpiry.has(name));
-    if (remainingBatch.length < 16) {
+    // The rewrite threshold applies to the inventory, not the byte-limited batch.
+    const remainingCount = candidates.length - selected.length + remainingBatch.length;
+    if (remainingCount < 16 || remainingBatch.length < 2) {
       continue;
     }
     // A static Git alias streams between native children without buffering packs in the Gateway.

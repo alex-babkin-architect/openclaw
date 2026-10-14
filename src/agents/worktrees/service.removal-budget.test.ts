@@ -164,7 +164,7 @@ it("backs off shared-repository snapshots after a missing-object failure", async
   }
 });
 
-it.each(["promised", "promised-retry", "unpromised", "checksum"] as const)(
+it.each(["promised", "promised-retry", "unpromised", "checksum", "byte-limited"] as const)(
   "consolidates healthy pack batches independently of missing snapshot objects (%s)",
   async (damage) => {
     const root = tempDirs.make("worktree-partial-clone-deferral-");
@@ -242,6 +242,18 @@ it.each(["promised", "promised-retry", "unpromised", "checksum"] as const)(
       await requireGit(source, ["config", "uploadpack.allowAnySHA1InWant", "true"]);
     }
     const before = (await fs.readdir(directory)).filter((name) => name.endsWith(".pack"));
+    if (damage === "byte-limited") {
+      // Exercise the 512-MiB budget with native tiny packs, without writing 640 MiB in a test.
+      const realStat = fs.stat.bind(fs);
+      vi.spyOn(fs, "stat").mockImplementation(async (...args) => {
+        const stat = await realStat(...args);
+        if (path.dirname(String(args[0])) === directory && String(args[0]).endsWith(".pack")) {
+          stat.size = 40 * 1024 * 1024;
+        }
+        return stat;
+      });
+    }
+    const expectedPacks = damage === "byte-limited" ? before.length - 11 : 1;
     const missing = await requireGit(repo, ["rev-list", "--objects", "--all", "--missing=print"]);
     expect(missing).toContain("?");
     await requireGit(repo, ["remote", "set-url", "origin", path.join(root, "unavailable.git")]);
@@ -258,12 +270,12 @@ it.each(["promised", "promised-retry", "unpromised", "checksum"] as const)(
       expect(result.failedCount).toBe(damage === "checksum" || damage === "promised-retry" ? 2 : 1);
       expect(result.deferredCount).toBe(1);
       const after = (await fs.readdir(directory)).filter((name) => name.endsWith(".pack"));
-      expect(after.length).toBe(damage === "checksum" ? before.length : 1);
+      expect(after.length).toBe(damage === "checksum" ? before.length : expectedPacks);
       expect(result.gitMaintenance).toMatchObject({
         repoRoot: repo,
         stage: damage === "checksum" || damage === "promised-retry" ? "suspended" : "completed",
         packsBefore: before.length,
-        ...(damage === "checksum" ? {} : { packsAfter: 1 }),
+        ...(damage === "checksum" ? {} : { packsAfter: expectedPacks }),
       });
       for (const record of records) {
         expect(await fs.readFile(path.join(record.path, "missing.txt"), "utf8")).toBe(
