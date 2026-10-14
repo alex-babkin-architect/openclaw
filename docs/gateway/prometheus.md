@@ -189,12 +189,14 @@ For traces, logs, OTLP push, and OpenTelemetry GenAI semantic attributes, see [O
 | `openclaw_diagnostic_async_queue_dropped_total`           | counter   | `drop_class`                                                                              |
 | `openclaw_diagnostic_async_queue_length`                  | gauge     | none                                                                                      |
 
-Worker message counters describe crossings of the Gateway main-thread boundary,
+Worker message counters describe posts and receives on Gateway main-thread worker transports,
 with `direction="to_worker"` or `direction="from_worker"`. The fixed `kind` labels
 separate SQLite requests and replies, task inputs and replies, task requests,
 notifications, consumption receipts, admission, authority, resources, lifecycle,
 memory, realtime, and other messages. Totals survive worker retirement and are
-published with memory samples.
+published with memory samples. Posts queued on a worker-bound port count when
+accepted by the port, even if cancellation later prevents handing that port to a
+worker. These counters describe transport work, not confirmed delivery.
 
 Payload bytes use existing encoded buffer sizes or inexpensive owner estimates;
 they exclude transport framing and do not measure structured-clone allocations.

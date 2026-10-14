@@ -206,10 +206,6 @@ function createStagingOwner(workerUrl: URL, nativeSource: RetainedNativeWorkerSo
         recordWorkerMessage("resource", "to_worker");
       }
     };
-    signal?.addEventListener("abort", abort, { once: true });
-    if (signal?.aborted) {
-      abort();
-    }
     const input: SqliteSnapshotStagingCommand =
       command.type === "prepare" && cancellation
         ? { ...command, preparationId, abortPort: cancellation.port2 }
@@ -235,6 +231,7 @@ function createStagingOwner(workerUrl: URL, nativeSource: RetainedNativeWorkerSo
             throw unavailable.error;
           }
           signal?.throwIfAborted();
+          signal?.addEventListener("abort", abort, { once: true });
           return input;
         },
         { inputBytes, transferList: () => (cancellation ? [cancellation.port2] : []) },
