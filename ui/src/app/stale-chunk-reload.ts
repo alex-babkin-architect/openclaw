@@ -284,9 +284,12 @@ function waitForRecoverySignal(delayMs: number, signal?: AbortSignal): Promise<v
 export function cancelStaleChunkRecovery(
   storage: Pick<Storage, "getItem" | "setItem"> | null = getSafeSessionStorage(),
 ): void {
-  const recovery = recoveryByStorage.get(storage ?? unavailableStorage);
+  const storageIdentity = storage ?? unavailableStorage;
+  const recovery = recoveryByStorage.get(storageIdentity);
   if (recovery?.pending && recovery.buildId === CONTROL_UI_BUILD_INFO.buildId) {
     recovery.controller?.abort();
+    // Unregister now: a surface failing before the aborted probe unwinds starts fresh.
+    recoveryByStorage.delete(storageIdentity);
   }
 }
 

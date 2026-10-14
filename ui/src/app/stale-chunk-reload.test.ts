@@ -638,6 +638,29 @@ describe("scheduleStaleChunkReload", () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
+  it("starts fresh recovery for a surface that fails right after a dismissal", async () => {
+    const heldProbe = deferred<Response>();
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementationOnce(async () => heldProbe.promise)
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const reload = vi.fn();
+    const storage = memoryStorage();
+
+    const dismissed = scheduleStaleChunkReload({ storage, reload });
+    await vi.advanceTimersByTimeAsync(0);
+    cancelStaleChunkRecovery(storage);
+    // The next failure arrives while the aborted probe is still in flight.
+    const rearmed = scheduleStaleChunkReload({ storage, reload });
+    heldProbe.resolve(new Response(null, { status: 503 }));
+    await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS);
+
+    await expect(dismissed).resolves.toBe(false);
+    await expect(rearmed).resolves.toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   it("keeps automatic recovery running after a failed manual retry", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
