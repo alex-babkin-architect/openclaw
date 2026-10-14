@@ -19,7 +19,11 @@ describe("classifyAssistantFailoverReason", () => {
     );
     expect(
       classifyAssistantFailoverReason(
-        { ...message, errorCode: "insufficient_quota" },
+        {
+          ...message,
+          errorMessage: "402: account balance exhausted",
+          errorCode: "insufficient_quota",
+        },
         { providerOwner: null },
       ),
     ).toBe("billing");

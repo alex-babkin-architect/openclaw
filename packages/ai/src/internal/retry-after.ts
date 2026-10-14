@@ -110,7 +110,7 @@ export function parseRetryAfterHeadersSeconds(
             ? remaining
             : typeof remaining === "string" && /^-?\d+(?:\.\d+)?$/.test(remaining.trim())
               ? Number(remaining)
-              : NaN;
+              : Number.NaN;
         if (!Number.isFinite(numericRemaining) || numericRemaining > 0) {
           continue;
         }
@@ -158,7 +158,7 @@ export function parseRetryAfterErrorSeconds(
       typeof status === "number" ? status : undefined,
     );
     const responseSeconds = parseRetryAfterHeadersSeconds(
-      ownDataValue(ownDataValue(error, "response"), "headers"),
+      ownDataValue(response, "headers"),
       nowMs,
       typeof responseStatus === "number"
         ? responseStatus
