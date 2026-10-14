@@ -100,9 +100,9 @@ type ActivitySessionGitProps = {
 
 export function ActivitySessionGit(props: ActivitySessionGitProps) {
   const token = {};
-  const gateway = createMemo(() => props.context.gateway);
-  const key = createMemo(() => props.sessionKey ?? "");
-  const source = () => ({ gateway: gateway(), key: key() });
+  const currentGateway = createMemo(() => props.context.gateway);
+  const sessionKey = createMemo(() => props.sessionKey ?? "");
+  const source = () => ({ gateway: currentGateway(), key: sessionKey() });
   const initial = untrack(source);
   const gatewayProjection = projectGateway(initial.gateway);
   const projection = projectSource(initial, {
