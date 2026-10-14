@@ -1,27 +1,28 @@
+import { createComponent, flush } from "solid-js";
 import { expect, it, vi } from "vitest";
-import "./agent-emoji-picker.ts";
+import { mountSolid } from "../test-helpers/mount-solid.ts";
+import { AgentEmojiPicker } from "./agent-emoji-picker.tsx";
 
-it("filters emoji choices, selects their value, and remounts after removal", async () => {
-  const picker = document.createElement("openclaw-agent-emoji-picker");
+it("filters emoji choices, selects their value, and remounts after removal", () => {
   const onSelect = vi.fn();
-  picker.onSelect = onSelect;
-  document.body.append(picker);
+  const mount = () =>
+    mountSolid(() => createComponent(AgentEmojiPicker, { value: "", disabled: false, onSelect }));
+  let view = mount();
   try {
-    await picker.updateComplete;
-    const search = picker.querySelector<HTMLInputElement>(".agent-emoji-picker__search")!;
+    flush();
+    const search = view.container.querySelector<HTMLInputElement>(".agent-emoji-picker__search")!;
     search.value = "rocket";
     search.dispatchEvent(new Event("input", { bubbles: true }));
-    await picker.updateComplete;
-    const choice = picker.querySelector<HTMLButtonElement>(".agent-emoji-picker__choice")!;
+    flush();
+    const choice = view.container.querySelector<HTMLButtonElement>(".agent-emoji-picker__choice")!;
     expect(choice.textContent).toBe("🚀");
     choice.click();
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("🚀");
-    picker.remove();
-    await Promise.resolve();
-    document.body.append(picker);
-    await picker.updateComplete;
-    expect(picker.querySelectorAll(".agent-emoji-picker__choice")).toHaveLength(24);
+    view.unmount();
+    view = mount();
+    flush();
+    expect(view.container.querySelectorAll(".agent-emoji-picker__choice")).toHaveLength(24);
   } finally {
-    picker.remove();
+    view.unmount();
   }
 });
