@@ -247,7 +247,11 @@ it.each(["promised", "promised-retry", "unpromised", "checksum", "byte-limited"]
       const realStat = fs.stat.bind(fs);
       vi.spyOn(fs, "stat").mockImplementation(async (...args) => {
         const stat = await realStat(...args);
-        if (path.dirname(String(args[0])) === directory && String(args[0]).endsWith(".pack")) {
+        if (
+          stat &&
+          path.dirname(String(args[0])) === directory &&
+          String(args[0]).endsWith(".pack")
+        ) {
           stat.size = 40 * 1024 * 1024;
         }
         return stat;
