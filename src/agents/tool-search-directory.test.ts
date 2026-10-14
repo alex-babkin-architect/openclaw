@@ -22,10 +22,9 @@ function localCatalog() {
   return [
     ...Array.from({ length: 32 }, (_, i) => `local_tool_${String(i).padStart(2, "0")}`),
     ...optionalNames,
-  ].map((name) => ({
-    ...createStubTool(name),
-    description: "Search the local archive. ".repeat(10),
-  }));
+  ].map((name) =>
+    Object.assign(createStubTool(name), { description: "Search the local archive. ".repeat(10) }),
+  );
 }
 
 function catalogRef(tools: ReturnType<typeof localCatalog>): ToolSearchCatalogRef {

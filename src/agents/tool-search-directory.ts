@@ -149,7 +149,7 @@ function formatToolSearchCatalogDirectory(
   entries: ToolSearchCatalogEntry[],
   mode: ToolSearchMode,
   maxChars: number,
-  descriptionMaxChars: number,
+  initialDescriptionMaxChars: number,
 ): string {
   const deferredEntries = entries.filter((entry) => !entry.directVisible);
   if (deferredEntries.length === 0) {
@@ -167,6 +167,7 @@ function formatToolSearchCatalogDirectory(
         (left.name < right.name ? -1 : left.name > right.name ? 1 : 0) ||
         (left.id < right.id ? -1 : left.id > right.id ? 1 : 0),
     );
+  let descriptionMaxChars = initialDescriptionMaxChars;
   const renderRows = () =>
     listedEntries
       .map((entry) => formatToolDirectoryEntry(entry, descriptionMaxChars))
