@@ -12,6 +12,28 @@ vi.mock("node:worker_threads", async (importOriginal) => ({
 }));
 
 describe("worker message metrics", () => {
+  it.each(["other", "lifecycle"] as const)(
+    "attributes resource close requests through %s transport",
+    (transport) => {
+      const before = getWorkerMessageMetrics().find(
+        (row) => row.kind === "resource" && row.direction === "to_worker",
+      );
+      const request = { closeResource: true, key: "fixture" };
+      observeWorkerMessage(
+        transport === "lifecycle" ? { type: "post", value: request } : request,
+        "to_worker",
+        transport,
+      );
+      expect(getWorkerMessageMetrics()).toContainEqual({
+        kind: "resource",
+        direction: "to_worker",
+        messages: (before?.messages ?? 0) + 1,
+        payloadBytes: before?.payloadBytes ?? 0,
+        unmeasuredMessages: (before?.unmeasuredMessages ?? 0) + 1,
+      });
+    },
+  );
+
   it("counts both serialized payloads in SQLite open requests", () => {
     const before = getWorkerMessageMetrics().find(
       (row) => row.kind === "sqlite_request" && row.direction === "to_worker",

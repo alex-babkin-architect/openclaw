@@ -39,6 +39,34 @@ async function createWorker(filename?: URL) {
 }
 
 describe("worker CPU lifecycle", () => {
+  it.each([
+    ["postMessage", "accessor"],
+    ["emit", "accessor"],
+    ["postMessage", "readonly"],
+    ["emit", "readonly"],
+  ] as const)("preserves a subclass with %s defined as %s", async (method, descriptorKind) => {
+    class ReadOnlyWorker extends Worker {}
+    const original = Worker.prototype[method];
+    const getter = vi.fn(() => original);
+    Object.defineProperty(
+      ReadOnlyWorker.prototype,
+      method,
+      descriptorKind === "accessor" ? { get: getter } : { value: original, writable: false },
+    );
+    const worker = new ReadOnlyWorker(
+      'const { parentPort } = require("node:worker_threads"); parentPort.on("message", (value) => parentPort.postMessage(value));',
+      { eval: true },
+    );
+    workers.push(worker);
+    if (method === "postMessage") {
+      expect(getter).not.toHaveBeenCalled();
+    }
+    await once(worker, "online");
+    const reply = once(worker, "message");
+    worker.postMessage("round trip", []);
+    expect(await reply).toEqual(["round trip"]);
+  });
+
   it.each(["dependency", "factory"])(
     "counts %s Workers without inspecting their payload accessors",
     async (mode) => {

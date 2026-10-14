@@ -172,6 +172,29 @@ export function markWorkerRetirement(
   }
 }
 
+function canObserveWorkerMessages(worker: Worker): boolean {
+  if (!Object.isExtensible(worker)) {
+    return false;
+  }
+  for (const method of ["postMessage", "emit"]) {
+    let owner: object | null = worker;
+    while (owner) {
+      const descriptor = Object.getOwnPropertyDescriptor(owner, method);
+      if (descriptor) {
+        if (!descriptor.writable || typeof descriptor.value !== "function") {
+          return false;
+        }
+        break;
+      }
+      owner = Reflect.getPrototypeOf(owner);
+    }
+    if (!owner) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function trackWorker(worker: WorkerCpuHandle): void {
   if (trackedWorkers.workers.has(worker)) {
     return;
@@ -179,6 +202,10 @@ function trackWorker(worker: WorkerCpuHandle): void {
   if (isMainThread && worker instanceof Worker) {
     // Worker construction clones startup data and inherited environment data once.
     recordWorkerMessage("lifecycle", "to_worker");
+  }
+  // Foreign Workers with accessor/read-only methods keep CPU/lifecycle coverage only.
+  // Inspect descriptors once at registration; never invoke getters or setters for metrics.
+  if (isMainThread && worker instanceof Worker && canObserveWorkerMessages(worker)) {
     // Per-instance hooks also cover plugin Workers, without adding a message listener
     // that would change native port reference semantics. Virtual retained handles
     // already observe their native task/control ports.

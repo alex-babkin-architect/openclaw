@@ -203,6 +203,10 @@ instead of appearing as measured zero-byte messages. Compare byte rankings with
 this coverage counter before drawing conclusions; nested worker-to-worker traffic
 does not cross the main-thread boundary.
 
+Foreign Worker instances with accessor or read-only methods, or nonextensible
+instances, retain CPU and lifecycle tracking but exclude per-message traffic.
+Instrumentation does not replace those protected methods.
+
 For model-call metrics, `observation_unit="request"` measures one observable
 provider request. `observation_unit="turn"` measures a synthetic Claude Code
 or Codex CLI agent turn that can contain multiple hidden provider requests.

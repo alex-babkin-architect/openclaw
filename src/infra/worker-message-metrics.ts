@@ -172,7 +172,7 @@ function messageKind(message: unknown, fallback: WorkerMessageKind): WorkerMessa
     case "request-error":
       return "lifecycle";
   }
-  return fallback;
+  return dataProperty(body, "closeResource") === true ? "resource" : fallback;
 }
 
 /** Observe each native boundary once; null preserves a prepared unknown byte count. */
