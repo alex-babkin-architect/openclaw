@@ -17,7 +17,7 @@
 | `willUpdate`                            | `createMemo`, or function-form `createSignal`                                                                  |
 | `updated()`                             | `createEffect(compute, apply)`; `apply` runs after the DOM commit and returns cleanup                          |
 | `firstUpdated`                          | `onSettled` (one-shot; return cleanup; no reactive primitives or `flush()` inside)                             |
-| `connected`/`disconnectedCallback`      | `onSettled` with returned cleanup; `onCleanup` for custom primitive disposal registration                      |
+| `connected`/`disconnectedCallback`      | synchronous setup + `onCleanup`; DOM-dependent `onSettled` + returned cleanup                                  |
 | `requestUpdate()`                       | delete it                                                                                                      |
 | `html`/`svg` templates                  | JSX                                                                                                            |
 | `cond ? html\`…\` : nothing`            | `<Show when>` or a ternary; `nothing` in attributes → `undefined`                                              |
@@ -41,6 +41,10 @@
 | `t("key")`                              | unchanged call shape; import `t` from `lib/reactive/i18n.ts`                                                   |
 
 Don't convert `keyed`, `live`, `guard`, `cache`, custom directives, unsafe HTML, controller lifetimes, or cancellation mechanically. Each encodes an ownership decision.
+
+Keep synchronous subscriptions in the component or factory body when descendants
+can publish during setup, and pair teardown with `onCleanup`. Use `onSettled`
+when setup needs committed DOM, and return its cleanup.
 
 ## Bindings and types
 
