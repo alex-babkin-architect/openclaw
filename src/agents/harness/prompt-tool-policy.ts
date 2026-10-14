@@ -100,7 +100,7 @@ export function createAgentHarnessPromptToolPolicy<T extends NamedTool>(params: 
                   catalog.ref.current?.entries ?? [],
                 )
               : buildToolSchemaDirectoryPrompt(
-                  { config: params.catalogPrompt.config, catalogRef: catalog.ref },
+                  { ...params.catalogPrompt, catalogRef: catalog.ref },
                   { contextTokenBudget: params.catalogPrompt.contextTokenBudget },
                 )
             : undefined,

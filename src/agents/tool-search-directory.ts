@@ -1,6 +1,7 @@
 import { normalizeStringEntries } from "@openclaw/normalization-core/string-normalization";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
 import { pruneMapToMaxSize } from "../infra/map-size.js";
+import { isLocalModelLeanEnabled } from "./local-model-lean.js";
 import {
   applyToolCatalogCompaction,
   collectUniqueCatalogToolNames,
@@ -70,7 +71,9 @@ export function buildToolSchemaDirectoryPrompt(
           Math.max(768, Math.floor(contextTokens / 10)),
         )
       : MAX_TOOL_SCHEMA_DIRECTORY_PROMPT_CHARS;
-  const cacheKey = `${config.mode}:${options?.includeMcp === false ? "without-mcp" : "all"}:${maxChars}`;
+  // Lean filtering must not buy longer descriptions for the remaining tools.
+  const descriptionMaxChars = isLocalModelLeanEnabled(ctx) ? 0 : 180;
+  const cacheKey = `${config.mode}:${options?.includeMcp === false ? "without-mcp" : "all"}:${maxChars}:${descriptionMaxChars}`;
   let cachedPrompts = toolSchemaDirectoryPromptCache.get(catalog.entries);
   // Caller-owned filters may change in place; cached text must not bypass them.
   const cachedPrompt = options?.allowedIds ? undefined : cachedPrompts?.get(cacheKey);
@@ -81,6 +84,7 @@ export function buildToolSchemaDirectoryPrompt(
     visibleCatalogEntries(catalog, options),
     config.mode,
     maxChars,
+    descriptionMaxChars,
   );
   if (options?.allowedIds) {
     return prompt;
@@ -145,6 +149,7 @@ function formatToolSearchCatalogDirectory(
   entries: ToolSearchCatalogEntry[],
   mode: ToolSearchMode,
   maxChars: number,
+  descriptionMaxChars: number,
 ): string {
   const deferredEntries = entries.filter((entry) => !entry.directVisible);
   if (deferredEntries.length === 0) {
@@ -162,7 +167,6 @@ function formatToolSearchCatalogDirectory(
         (left.name < right.name ? -1 : left.name > right.name ? 1 : 0) ||
         (left.id < right.id ? -1 : left.id > right.id ? 1 : 0),
     );
-  let descriptionMaxChars = 180;
   const renderRows = () =>
     listedEntries
       .map((entry) => formatToolDirectoryEntry(entry, descriptionMaxChars))
