@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolveSchemaMigrationBackupTables } from "./schema-migration-backup-scope.js";
 
-// Synthetic declarations exercise selection without certifying a production migration's scope.
+// mock-isolation: Synthetic declarations test selection without certifying real migration scopes.
 vi.mock("./schema-migration-backup-tables.js", () => ({
   SCHEMA_MIGRATION_BACKUP_TABLES: {
     agent: { 27: ["outbox"], 28: ["other", "outbox"] },

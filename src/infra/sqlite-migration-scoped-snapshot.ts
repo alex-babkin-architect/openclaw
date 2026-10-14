@@ -89,12 +89,14 @@ export function inspectScopedMigrationTables(
     requireAuthorizer(source);
     const catalog = source
       .prepare("SELECT type, name, tbl_name, sql FROM sqlite_master")
+      // SAFETY: SQLite owns these catalog columns and their fixed string/null types.
       .all() as Array<{
       type: string;
       name: string;
       tbl_name: string;
       sql: string | null;
     }>;
+    // SAFETY: SQLite table_list returns string names/types and an integer WITHOUT ROWID flag.
     const tableKinds = source.prepare("PRAGMA table_list").all() as Array<{
       name: string;
       type: string;
@@ -137,6 +139,7 @@ export function inspectScopedMigrationTables(
             `${name} uses shared sqlite_sequence metadata`,
           );
         }
+        // SAFETY: SQLite table_xinfo returns string column names and integer hidden flags.
         const columns = source.prepare(`PRAGMA table_xinfo(${quote(object.name)})`).all() as Array<{
           name: string;
           hidden: number;

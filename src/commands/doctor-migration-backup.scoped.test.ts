@@ -19,6 +19,7 @@ vi.mock("../state/openclaw-state-db-fast-path.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../state/openclaw-state-db-fast-path.js")>()),
   needsOpenClawStateDatabaseSchemaRepair: () => false,
 }));
+// mock-isolation: Synthetic scopes isolate backup selection without certifying real migrations.
 vi.mock("../state/schema-migration-backup-scope.js", () => ({
   resolveSchemaMigrationBackupTables: vi.fn(),
 }));
