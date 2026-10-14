@@ -165,7 +165,7 @@ it("backs off shared-repository snapshots after a missing-object failure", async
 });
 
 it.each(["promised", "promised-retry", "unpromised", "checksum"] as const)(
-  "maintains deferred partial-clone packs only when missing objects are promised (%s)",
+  "consolidates healthy pack batches independently of missing snapshot objects (%s)",
   async (damage) => {
     const root = tempDirs.make("worktree-partial-clone-deferral-");
     const source = await initializeRepository(root);
@@ -255,17 +255,23 @@ it.each(["promised", "promised-retry", "unpromised", "checksum"] as const)(
       });
       const result = await service.gc({ retryDeferred: damage === "promised-retry" });
       expect(result.removed).toEqual([]);
-      expect(result.failedCount).toBe(1);
+      expect(result.failedCount).toBe(damage === "checksum" || damage === "promised-retry" ? 2 : 1);
       expect(result.deferredCount).toBe(1);
       const after = (await fs.readdir(directory)).filter((name) => name.endsWith(".pack"));
-      expect(after.length).toBe(damage.startsWith("promised") ? 1 : before.length);
+      expect(after.length).toBe(damage === "checksum" ? before.length : 1);
+      expect(result.gitMaintenance).toMatchObject({
+        repoRoot: repo,
+        stage: damage === "checksum" || damage === "promised-retry" ? "suspended" : "completed",
+        packsBefore: before.length,
+        ...(damage === "checksum" ? {} : { packsAfter: 1 }),
+      });
       for (const record of records) {
         expect(await fs.readFile(path.join(record.path, "missing.txt"), "utf8")).toBe(
           "omitted blob\n",
         );
         expect(getRegistryWorktree(env, record.id)?.removedAt).toBeUndefined();
       }
-      if (damage.startsWith("promised")) {
+      if (damage !== "checksum") {
         expect(await requireGit(repo, ["rev-list", "--objects", "--all", "--missing=print"])).toBe(
           missing,
         );
@@ -276,6 +282,7 @@ it.each(["promised", "promised-retry", "unpromised", "checksum"] as const)(
         ).not.toContain("missing");
         await requireGit(repo, ["multi-pack-index", "verify"]);
       }
+      expect(await fs.readFile(trace, "utf8")).not.toContain('"fsck"');
       if (damage !== "promised-retry") {
         expect(await fs.readFile(trace, "utf8")).not.toContain("upload-pack");
       }
