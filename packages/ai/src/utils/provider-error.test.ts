@@ -60,6 +60,7 @@ describe("projectProviderError", () => {
         }),
       );
       const projection = projectProviderError(error);
+      expect(projection.retryAfterMs).toBe(seconds * 1000);
       expect(projection.errorMessage).toContain(`Retry-After: ${seconds} seconds`);
       expect(projection.errorBody).toBe('{"message":"rate limited"}');
       expect(JSON.stringify(projection)).not.toContain("synthetic-credential");
