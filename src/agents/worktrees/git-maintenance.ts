@@ -265,6 +265,7 @@ async function consolidatePacks(
     packs.push({ name, size: stat.size, promisor: present.has(`${stem}.promisor`) });
   }
   packs.sort((a, b) => a.size - b.size || a.name.localeCompare(b.name));
+  let objectFormat: string | undefined;
   for (const promisor of [true, false]) {
     const candidates = packs.filter((pack) => pack.promisor === promisor);
     const selected = [];
@@ -281,6 +282,7 @@ async function consolidatePacks(
     }
     // Validate only the packs this pass may retire, without walking refs or
     // missing partial-clone objects. The streaming writer does not check source CRCs.
+    objectFormat ??= await requireGit(repoRoot, ["rev-parse", "--show-object-format"], options);
     const verifyDeadline = performance.now() + PACK_BATCH_TIMEOUT_MS;
     for (let offset = 0; offset < selected.length; offset += 128) {
       const timeoutMs = Math.ceil(verifyDeadline - performance.now());
@@ -290,8 +292,20 @@ async function consolidatePacks(
       // Relative names and bounded argv also fit Windows' command-line limit.
       await requireGit(
         directory,
-        ["-c", "pack.threads=1", "verify-pack", ...selected.slice(offset, offset + 128)],
-        { ...options, timeoutMs },
+        [
+          "-c",
+          "pack.threads=1",
+          "verify-pack",
+          `--object-format=${objectFormat}`,
+          ...selected.slice(offset, offset + 128),
+        ],
+        {
+          ...options,
+          timeoutMs,
+          // Standalone verification checks this pack/index, without rediscovering
+          // the entire partial clone for every index-pack child. Git ignores a ceiling at cwd.
+          env: { ...options.env, GIT_CEILING_DIRECTORIES: path.dirname(directory) },
+        },
       );
     }
     await requireGit(

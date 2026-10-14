@@ -751,7 +751,8 @@ describe("worktree GC inventories", () => {
     return (
       args[0] === "maintenance" ||
       args[0] === "multi-pack-index" ||
-      (args[0] === "rev-parse" && args[1] === "--git-common-dir") ||
+      (args[0] === "rev-parse" &&
+        ["--git-common-dir", "--show-object-format"].includes(args[1]!)) ||
       (args[0] === "rev-parse" && args[1] === "--git-path" && args[2] === "objects/pack")
     );
   }
