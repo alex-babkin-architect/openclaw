@@ -366,8 +366,9 @@ suite.define(() => {
         await gateway.rejectDeferred("connect", mismatch);
         await page.waitForFunction(
           () =>
-            sessionStorage.getItem("openclaw.controlUi.staleChunkReloadBuildId") ===
-              "replacement-build" &&
+            JSON.parse(
+              sessionStorage.getItem("openclaw.controlUi.staleChunkReloadBuildId") ?? "null",
+            )?.buildId === "replacement-build" &&
             sessionStorage.getItem("openclaw.control-ui-e2e.build-rejection-loads") === "2",
         );
 
