@@ -13,7 +13,14 @@ import {
   markWorkerRetirement,
   sampleTrackedWorkerMemory,
 } from "./worker-cpu.js";
+import { getWorkerMessageMetrics } from "./worker-message-metrics.js";
 import { WorkerTaskPool } from "./worker-task-pool.js";
+
+// These endpoints run on the Gateway main thread; Vitest itself runs in a worker.
+vi.mock("node:worker_threads", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:worker_threads")>()),
+  isMainThread: true,
+}));
 
 const workers: Worker[] = [];
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);
@@ -32,6 +39,90 @@ async function createWorker(filename?: URL) {
 }
 
 describe("worker CPU lifecycle", () => {
+  it.each(["dependency", "factory"])(
+    "counts %s Workers without inspecting their payload accessors",
+    async (mode) => {
+      const metric = () =>
+        getWorkerMessageMetrics().find(
+          (entry) => entry.kind === "other" && entry.direction === "to_worker",
+        );
+      const before = metric();
+      const source =
+        'const { parentPort } = require("node:worker_threads"); parentPort.on("message", (value) => parentPort.postMessage(value));';
+      const worker =
+        mode === "dependency"
+          ? new Worker(source, { eval: true })
+          : createCpuTrackedWorker(source, { eval: true });
+      workers.push(worker);
+      await once(worker, "online");
+      const input = vi.fn(() => "payload");
+      const reply = once(worker, "message");
+      worker.postMessage(
+        {
+          get input() {
+            return input();
+          },
+        },
+        [],
+      );
+      expect(await reply).toEqual([{ input: "payload" }]);
+      expect(input).toHaveBeenCalledTimes(1);
+      expect(metric()).toEqual({
+        kind: "other",
+        direction: "to_worker",
+        messages: (before?.messages ?? 0) + 1,
+        payloadBytes: before?.payloadBytes ?? 0,
+        unmeasuredMessages: (before?.unmeasuredMessages ?? 0) + 1,
+      });
+    },
+  );
+
+  it("counts native messages once and measures transferred bytes before detachment", async () => {
+    const metric = (direction: "to_worker" | "from_worker") =>
+      getWorkerMessageMetrics().find(
+        (entry) => entry.kind === "sqlite_request" && entry.direction === direction,
+      );
+    const beforeSend = metric("to_worker");
+    const beforeReceive = metric("from_worker");
+    const worker = createCpuTrackedWorker(
+      'const { parentPort } = require("node:worker_threads"); parentPort.on("message", (value) => parentPort.postMessage(value));',
+      { eval: true },
+    );
+    workers.push(worker);
+    await once(worker, "online");
+    const post = vi.spyOn(Worker.prototype, "postMessage");
+    const emit = vi.spyOn(Worker.prototype, "emit");
+    const input = new Uint8Array([1, 2, 3]);
+    const received = once(worker, "message");
+    worker.postMessage({ type: "execute", actor: 1, id: 1, input }, [input.buffer]);
+    expect(input.byteLength).toBe(0);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(await received).toEqual([
+      { type: "execute", actor: 1, id: 1, input: new Uint8Array([1, 2, 3]) },
+    ]);
+    expect(emit).toHaveBeenCalledWith("message", {
+      type: "execute",
+      actor: 1,
+      id: 1,
+      input: new Uint8Array([1, 2, 3]),
+    });
+    expect(() => worker.postMessage({ type: "execute", actor: 1, input() {} }, [])).toThrow();
+    expect(metric("to_worker")).toEqual({
+      kind: "sqlite_request",
+      direction: "to_worker",
+      messages: (beforeSend?.messages ?? 0) + 1,
+      payloadBytes: (beforeSend?.payloadBytes ?? 0) + 3,
+      unmeasuredMessages: beforeSend?.unmeasuredMessages ?? 0,
+    });
+    expect(metric("from_worker")).toEqual({
+      kind: "sqlite_request",
+      direction: "from_worker",
+      messages: (beforeReceive?.messages ?? 0) + 1,
+      payloadBytes: (beforeReceive?.payloadBytes ?? 0) + 3,
+      unmeasuredMessages: beforeReceive?.unmeasuredMessages ?? 0,
+    });
+  });
+
   it.each([
     ["sqlite-store.worker.ts", "sqlite-store.worker.js"],
     ["private-session-worker.js", "other"],

@@ -28,6 +28,7 @@ import type {
   SqliteSnapshotStagingRequest,
   SqliteSnapshotStagingReply,
 } from "./sqlite-snapshot-staging.types.js";
+import { recordWorkerMessage } from "./worker-message-metrics.js";
 import {
   captureRetainedNativeWorkerSource,
   type RetainedNativeWorkerSource,
@@ -199,7 +200,12 @@ function createStagingOwner(workerUrl: URL, nativeSource: RetainedNativeWorkerSo
     const preparationId = ++preparationSequence;
     const inputBytes = Buffer.byteLength(JSON.stringify({ ...command, preparationId }));
     const cancellation = command.type === "prepare" ? new MessageChannel() : undefined;
-    const abort = () => cancellation?.port1.postMessage({ type: "abort" });
+    const abort = () => {
+      if (cancellation) {
+        cancellation.port1.postMessage({ type: "abort" });
+        recordWorkerMessage("resource", "to_worker");
+      }
+    };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) {
       abort();
