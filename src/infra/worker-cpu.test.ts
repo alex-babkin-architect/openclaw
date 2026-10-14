@@ -39,6 +39,32 @@ async function createWorker(filename?: URL) {
 }
 
 describe("worker CPU lifecycle", () => {
+  it("attributes dedicated reclamation requests and replies once at the native boundary", async () => {
+    const before = getWorkerMessageMetrics();
+    const worker = createCpuTrackedWorker(
+      'const { parentPort } = require("node:worker_threads"); parentPort.on("message", ({ operationId }) => parentPort.postMessage({ type: "reclaimed", operationId, settled: true, result: {} }));',
+      { eval: true },
+    );
+    workers.push(worker);
+    await once(worker, "online");
+    const reply = once(worker, "message");
+    worker.postMessage({ type: "reclaim", operationId: 1, plan: {}, coordination: {} }, []);
+    expect(await reply).toEqual([{ type: "reclaimed", operationId: 1, settled: true, result: {} }]);
+    for (const [kind, direction] of [
+      ["sqlite_request", "to_worker"],
+      ["sqlite_reply", "from_worker"],
+    ] as const) {
+      const previous = before.find((row) => row.kind === kind && row.direction === direction);
+      expect(getWorkerMessageMetrics()).toContainEqual({
+        kind,
+        direction,
+        messages: (previous?.messages ?? 0) + 1,
+        payloadBytes: previous?.payloadBytes ?? 0,
+        unmeasuredMessages: (previous?.unmeasuredMessages ?? 0) + 1,
+      });
+    }
+  });
+
   it.each([
     ["postMessage", "accessor"],
     ["emit", "accessor"],

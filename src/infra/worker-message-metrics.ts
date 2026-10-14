@@ -150,6 +150,24 @@ function messageKind(message: unknown, fallback: WorkerMessageKind): WorkerMessa
   ) {
     return "sqlite_reply";
   }
+  if (typeof dataProperty(body, "operationId") === "number") {
+    switch (dataProperty(body, "type")) {
+      case "prepare":
+      case "reclaim":
+      case "canonical-validation":
+        return "sqlite_request";
+      case "reclaimed":
+      case "refused":
+      case "checkpoint":
+        return "sqlite_reply";
+      case "admission":
+      case "admission-request":
+      case "admission-release":
+        return "admission";
+      case "commit-request":
+        return "authority";
+    }
+  }
   switch (dataProperty(body, "type")) {
     case "resource-owner":
     case "resource-message":
@@ -162,6 +180,8 @@ function messageKind(message: unknown, fallback: WorkerMessageKind): WorkerMessa
     case "created":
     case "stop":
     case "stopped":
+    case "close":
+    case "closed":
     case "release":
     case "ref":
     case "execution-exit":
