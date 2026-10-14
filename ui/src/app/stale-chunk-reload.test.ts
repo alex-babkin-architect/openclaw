@@ -266,6 +266,20 @@ describe("scheduleStaleChunkReload", () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
+  it("defers recovery in a reloaded document until the loop guard expires", async () => {
+    const reload = vi.fn();
+    // A fresh document inherits only the persisted guard from the reload that created it.
+    const storage = memoryStorage({ [GUARD_KEY]: guard(CONTROL_UI_BUILD_INFO.buildId) });
+    const fetchMock = stubDocumentFetch(new Response(null, { status: 200 }));
+    const pending = scheduleStaleChunkReload({ storage, reload });
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   it("does not replace an active Gateway build target with a generic chunk failure", async () => {
     vi.useFakeTimers();
     const reload = vi.fn();
@@ -288,13 +302,12 @@ describe("scheduleStaleChunkReload", () => {
     const reload = vi.fn();
     const storage = memoryStorage({ [GUARD_KEY]: guard("build-a") });
     stubDocumentFetch(new Response(null, { status: 200 }));
-    await expect(
-      scheduleStaleChunkReload({
-        buildId: "build-a",
-        storage,
-        reload,
-      }),
-    ).resolves.toBe(false);
+    const guardedRecovery = scheduleStaleChunkReload({
+      buildId: "build-a",
+      storage,
+      reload,
+    });
+    await vi.advanceTimersByTimeAsync(0);
     expect(reload).not.toHaveBeenCalled();
     await expect(
       scheduleStaleChunkReload({
@@ -303,6 +316,7 @@ describe("scheduleStaleChunkReload", () => {
         reload,
       }),
     ).resolves.toBe(true);
+    await expect(guardedRecovery).resolves.toBe(false);
     expect(reload).toHaveBeenCalledTimes(1);
     expect(storage.getItem(GUARD_KEY)).toBe(guard("build-b"));
   });

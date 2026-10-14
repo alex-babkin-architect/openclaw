@@ -471,7 +471,7 @@
         try {
           var initialUrl = new URL(window.location.href);
           var recoveryMarker = initialUrl.searchParams.get("openclaw_mount_recovery");
-          // Older runtime reloads used a timestamp instead of an attempt count.
+          // Runtime reloads pass a timestamp cache buster; count it as the first recovery navigation.
           if (recoveryMarker !== null) {
             var count = Number(recoveryMarker);
             recoveryNavigation =

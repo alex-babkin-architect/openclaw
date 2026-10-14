@@ -124,11 +124,14 @@ export async function scheduleStaleChunkReload(deps: StaleChunkReloadDeps = {}):
   }
   const storage = deps.storage === undefined ? getSafeSessionStorage() : deps.storage;
   const buildId = deps.buildId ?? CONTROL_UI_BUILD_INFO.buildId;
-  // Bound broken-build loops without disabling recovery for later network blips.
+  // A recent automatic reload of this build defers the next one instead of refusing it:
+  // a broken build reloads at most once per window, while a later network blip still
+  // recovers on its own.
+  let guardDelayMs = 0;
   try {
     const guard = JSON.parse(storage?.getItem(RELOAD_GUARD_STORAGE_KEY) ?? "null");
-    if (guard?.buildId === buildId && Date.now() - guard.at < RELOAD_GUARD_WINDOW_MS) {
-      return false;
+    if (guard?.buildId === buildId && typeof guard.at === "number") {
+      guardDelayMs = Math.max(0, guard.at + RELOAD_GUARD_WINDOW_MS - Date.now());
     }
   } catch {
     // Unreadable storage follows the same safe path as unavailable storage.
@@ -136,15 +139,13 @@ export async function scheduleStaleChunkReload(deps: StaleChunkReloadDeps = {}):
   const now = Date.now();
   const storageIdentity = storage ?? unavailableStorage;
   let recovery = recoveryByStorage.get(storageIdentity);
+  // This document already issued a reload and is being replaced.
+  if (recovery?.buildId === null && now - recovery.attemptedAt < RELOAD_GUARD_WINDOW_MS) {
+    return false;
+  }
   // A generic chunk failure cannot replace the server build already being
   // recovered. Only the Gateway owns a new target artifact and retry lifetime.
-  if (
-    deps.buildId === undefined &&
-    recovery &&
-    recovery.buildId !== buildId &&
-    ((recovery.buildId === null && now - recovery.attemptedAt < RELOAD_GUARD_WINDOW_MS) ||
-      recovery.pending)
-  ) {
+  if (deps.buildId === undefined && recovery?.pending && recovery.buildId !== buildId) {
     return false;
   }
   if (
@@ -168,9 +169,12 @@ export async function scheduleStaleChunkReload(deps: StaleChunkReloadDeps = {}):
           canReloadControlUiDocument(),
         controller.signal,
       );
-    const delayMs =
-      deps.buildId === undefined ? 0 : Math.floor(Math.random() * BUILD_RELOAD_JITTER_MS);
-    target.pending = delayMs > 0 ? sleepWithAbort(delayMs).then(wait) : wait();
+    const delayMs = Math.max(
+      guardDelayMs,
+      deps.buildId === undefined ? 0 : Math.floor(Math.random() * BUILD_RELOAD_JITTER_MS),
+    );
+    target.pending =
+      delayMs > 0 ? sleepWithAbort(delayMs, controller.signal).then(wait, () => false) : wait();
     recovery = target;
   }
   try {
