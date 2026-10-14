@@ -3,7 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { KeyedAsyncQueue } from "openclaw/plugin-sdk/keyed-async-queue";
 
-const activeVaultMutations = new AsyncLocalStorage<ReadonlySet<string>>();
+type ActiveVaultMutation = { active: boolean };
+
+const activeVaultMutations = new AsyncLocalStorage<ReadonlyMap<string, ActiveVaultMutation>>();
 const vaultMutationQueue = new KeyedAsyncQueue();
 const MAX_CACHED_VAULT_KEYS = 256;
 const canonicalVaultKeys = new Map<string, Promise<string>>();
@@ -61,12 +63,20 @@ export async function withMemoryWikiVaultMutation<T>(
 ): Promise<T> {
   const key = await resolveMemoryWikiVaultMutationKey(vaultPath);
   const active = activeVaultMutations.getStore();
-  if (active?.has(key)) {
+  if (active?.get(key)?.active) {
     return await mutation();
   }
 
-  // Mutation callers await their nested work; detached children are not supported.
-  return await vaultMutationQueue.enqueue(key, () =>
-    activeVaultMutations.run(new Set(active).add(key), mutation),
-  );
+  const lease = { active: true };
+  const nextActive = new Map(active ?? []);
+  nextActive.set(key, lease);
+  return await vaultMutationQueue.enqueue(key, async () => {
+    try {
+      return await activeVaultMutations.run(nextActive, mutation);
+    } finally {
+      // Detached children inherit this object. Mark it inactive when the
+      // owner exits so later work queues instead of bypassing serialization.
+      lease.active = false;
+    }
+  });
 }

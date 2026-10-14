@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { setImmediate } from "node:timers/promises";
 import { describe, expect, it } from "vitest";
 import { deferred } from "./deferred.test-helpers.js";
 import { withMemoryWikiVaultMutation } from "./mutation-coordinator.js";
@@ -86,6 +87,41 @@ describe("withMemoryWikiVaultMutation", () => {
     } finally {
       releaseFirst.resolve();
       await Promise.allSettled([first, alias].filter((item) => item !== undefined));
+    }
+  });
+  it("queues detached work after its inherited transaction has ended", async () => {
+    const releaseDetached = deferred();
+    const holderEntered = deferred();
+    const releaseHolder = deferred();
+    let detachedEntered = false;
+    let detached!: Promise<void>;
+
+    await withMemoryWikiVaultMutation("/tmp/wiki-detached", async () => {
+      detached = (async () => {
+        await releaseDetached.promise;
+        await withMemoryWikiVaultMutation("/tmp/wiki-detached", async () => {
+          detachedEntered = true;
+        });
+      })();
+    });
+
+    const holder = withMemoryWikiVaultMutation("/tmp/wiki-detached", async () => {
+      holderEntered.resolve();
+      await releaseHolder.promise;
+    });
+    try {
+      await holderEntered.promise;
+      releaseDetached.resolve();
+      await setImmediate();
+      expect(detachedEntered).toBe(false);
+
+      releaseHolder.resolve();
+      await Promise.all([holder, detached]);
+      expect(detachedEntered).toBe(true);
+    } finally {
+      releaseDetached.resolve();
+      releaseHolder.resolve();
+      await Promise.allSettled([holder, detached]);
     }
   });
 });
