@@ -446,18 +446,35 @@ describe("createAgentHarnessToolSurfaceRuntime", () => {
     runtime.cleanup();
   });
 
-  it.each([true, false])(
-    "resolves lean directory presentation from the session agent (%s)",
-    (lean) => {
-      const runtime = createAgentHarnessToolSurfaceRuntime({
-        config: {
-          agents: {
-            defaults: { experimental: { localModelLean: !lean } },
-            entries: { main: {}, scoped: { experimental: { localModelLean: lean } } },
-          },
-          tools: { codeMode: false, toolSearch: { mode: "tools" } },
+  it.each(
+    [true, false].flatMap((lean) => ["agentId", "sessionKey"].map((scope) => ({ lean, scope }))),
+  )(
+    "preserves lean=$lean directory presentation across worker projection via $scope",
+    ({ lean, scope }) => {
+      const config: OpenClawConfig = {
+        agents: {
+          defaults: { experimental: { localModelLean: !lean } },
+          entries: { main: {}, scoped: { experimental: { localModelLean: lean } } },
         },
-        sessionKey: "agent:scoped:main",
+        tools: { codeMode: false, toolSearch: { mode: "tools" } },
+      };
+      const selection =
+        scope === "agentId" ? { agentId: "scoped" } : { sessionKey: "agent:scoped:main" };
+      const runtime = createAgentHarnessToolSurfaceRuntime({
+        config,
+        ...selection,
+        modelToolsEnabled: true,
+      });
+      const worker = createAgentHarnessToolSurfaceRuntimeBase({
+        presentation: structuredClone(
+          prepareAgentToolSurfacePresentation({
+            config,
+            ...selection,
+            toolsEnabled: true,
+            isRawModelRun: false,
+            forceDirectMessageTool: false,
+          }),
+        ),
         modelToolsEnabled: true,
       });
       try {
@@ -469,7 +486,15 @@ describe("createAgentHarnessToolSurfaceRuntime", () => {
         expect(prompt).toContain("- fixture_lookup (core)");
         expect(prompt?.includes("Search the local archive.")).toBe(!lean);
         expect(prompt?.includes("- browser (core)")).toBe(!lean);
+        const projected = worker.compactTools([lookup], {
+          prepared: { preserveToolNames: [] },
+        });
+        const directory = projected.promptToolPolicy.apply().toolSchemaDirectoryPrompt;
+        expect(directory?.split("\n").filter((line) => line.startsWith("- "))).toEqual([
+          lean ? "- fixture_lookup (core)" : "- fixture_lookup (core): Search the local archive.",
+        ]);
       } finally {
+        worker.cleanup();
         runtime.cleanup();
       }
     },

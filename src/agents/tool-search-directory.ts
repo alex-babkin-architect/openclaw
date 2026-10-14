@@ -57,7 +57,10 @@ export function applyToolSchemaDirectoryCatalog(params: {
 
 export function buildToolSchemaDirectoryPrompt(
   ctx: ToolSearchToolContext,
-  options?: CatalogVisibilityOptions & { contextTokenBudget?: number },
+  options?: CatalogVisibilityOptions & {
+    contextTokenBudget?: number;
+    toolSearchDirectoryLean?: boolean;
+  },
 ): string {
   const config = resolveToolSearchConfig(ctx.runtimeConfig ?? ctx.config);
   const catalog = resolveCatalog(ctx);
@@ -72,7 +75,8 @@ export function buildToolSchemaDirectoryPrompt(
         )
       : MAX_TOOL_SCHEMA_DIRECTORY_PROMPT_CHARS;
   // Lean filtering must not buy longer descriptions for the remaining tools.
-  const descriptionMaxChars = isLocalModelLeanEnabled(ctx) ? 0 : 180;
+  const descriptionMaxChars =
+    (options?.toolSearchDirectoryLean ?? isLocalModelLeanEnabled(ctx)) ? 0 : 180;
   const cacheKey = `${config.mode}:${options?.includeMcp === false ? "without-mcp" : "all"}:${maxChars}:${descriptionMaxChars}`;
   let cachedPrompts = toolSchemaDirectoryPromptCache.get(catalog.entries);
   // Caller-owned filters may change in place; cached text must not bypass them.

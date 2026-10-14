@@ -75,6 +75,18 @@ describe("lean Tool Search directory", () => {
     expect(lean).not.toContain("Search the local archive");
     expect(buildToolSchemaDirectoryPrompt({ config, agentId: "full", catalogRef: ref })).toBe(full);
     expect(buildToolSchemaDirectoryPrompt({ config, agentId: "lean", catalogRef: ref })).toBe(lean);
+    expect(
+      buildToolSchemaDirectoryPrompt(
+        { config, agentId: "full", catalogRef: ref },
+        { toolSearchDirectoryLean: true },
+      ),
+    ).toBe(lean);
+    expect(
+      buildToolSchemaDirectoryPrompt(
+        { config, agentId: "lean", catalogRef: ref },
+        { toolSearchDirectoryLean: false },
+      ),
+    ).toBe(full);
     const policy = createAgentHarnessPromptToolPolicy({
       tools: [createStubTool("tool_search")],
       catalogRef: ref,

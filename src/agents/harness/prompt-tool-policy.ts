@@ -45,6 +45,7 @@ export function createAgentHarnessPromptToolPolicy<T extends NamedTool>(params: 
     agentId?: string;
     sessionKey?: string;
     contextTokenBudget?: number;
+    toolSearchDirectoryLean?: boolean;
   };
 }) {
   const baselineTools = [...params.tools];
@@ -106,7 +107,10 @@ export function createAgentHarnessPromptToolPolicy<T extends NamedTool>(params: 
                 )
               : buildToolSchemaDirectoryPrompt(
                   { ...params.catalogPrompt, catalogRef: catalog.ref },
-                  { contextTokenBudget: params.catalogPrompt.contextTokenBudget },
+                  {
+                    contextTokenBudget: params.catalogPrompt.contextTokenBudget,
+                    toolSearchDirectoryLean: params.catalogPrompt.toolSearchDirectoryLean,
+                  },
                 )
             : undefined,
         callableToolNames: normalizeUniqueStringEntries([
