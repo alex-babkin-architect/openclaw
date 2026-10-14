@@ -145,7 +145,7 @@ or is restored from browser history. If an update finished while the tab was sus
 can recover without receiving the original update notification or opening a new tab.
 
 Automatic build-recovery reloads spread their first page check over up to two seconds
-and reload at most once per target build in a two-minute window. Reloads wait for the page to be reachable
+and reload at most once per target build every 30 seconds. Reloads wait for the page to be reachable
 and respect unsaved-work protection.
 The current route and stored drafts survive the reload. If browser storage is unavailable
 or reload protection blocks recovery, reload the tab after saving your work;
@@ -296,7 +296,7 @@ missing from the current sidebar page does not count as deletion.
 
 Opening a view for the first time can fail if its interface files cannot be downloaded.
 The UI waits for reachability and reloads automatically, subject to reload protection
-and the two-minute loop guard. You can also use **Reload**. The same error can occur after an update;
+and the 30-second loop guard. You can also use **Reload**. The same error can occur after an update;
 it does not by itself mean a new version was installed. If unsaved work blocks the
 reload, follow the displayed save or cancel guidance, then try again.
 

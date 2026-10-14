@@ -22,7 +22,7 @@ const ATTEMPT_COOLDOWN_MS = 5_000;
 // another probe immediately while the gateway is still unreachable.
 const DOCUMENT_PROBE_TIMEOUT_MS = 3_000;
 const BUILD_RELOAD_JITTER_MS = 2_000;
-const RELOAD_GUARD_WINDOW_MS = 120_000;
+const RELOAD_GUARD_WINDOW_MS = 30_000;
 
 // WebKit, Chromium, Firefox, and Vite's preload helper use these four phrases.
 const MODULE_IMPORT_ERROR_PATTERN =

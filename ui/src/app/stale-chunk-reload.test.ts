@@ -259,7 +259,7 @@ describe("scheduleStaleChunkReload", () => {
     const storage = memoryStorage();
     stubDocumentFetch(new Response(null, { status: 200 }), new Response(null, { status: 200 }));
     await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(true);
-    await vi.advanceTimersByTimeAsync(119_999);
+    await vi.advanceTimersByTimeAsync(29_999);
     await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     await expect(scheduleStaleChunkReload({ storage, reload })).resolves.toBe(true);
@@ -272,7 +272,7 @@ describe("scheduleStaleChunkReload", () => {
     const storage = memoryStorage({ [GUARD_KEY]: guard(CONTROL_UI_BUILD_INFO.buildId) });
     const fetchMock = stubDocumentFetch(new Response(null, { status: 200 }));
     const pending = scheduleStaleChunkReload({ storage, reload });
-    await vi.advanceTimersByTimeAsync(119_999);
+    await vi.advanceTimersByTimeAsync(29_999);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
