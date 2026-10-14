@@ -40,7 +40,12 @@ export function createAgentHarnessPromptToolPolicy<T extends NamedTool>(params: 
   catalogRef?: ToolSearchCatalogRef;
   catalogEntries?: readonly ToolSearchCatalogEntry[];
   codeModeControlsEnabled: boolean;
-  catalogPrompt?: { config?: OpenClawConfig; agentId?: string; contextTokenBudget?: number };
+  catalogPrompt?: {
+    config?: OpenClawConfig;
+    agentId?: string;
+    sessionKey?: string;
+    contextTokenBudget?: number;
+  };
 }) {
   const baselineTools = [...params.tools];
   const currentCatalog = params.catalogRef?.current;

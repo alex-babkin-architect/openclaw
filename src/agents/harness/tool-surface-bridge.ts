@@ -215,6 +215,7 @@ export function createAgentHarnessToolSurfaceRuntimeCore(
             ? {
                 config: codeModeControlsEnabled ? params.config : toolSearchRuntimeConfig,
                 agentId: params.agentId,
+                sessionKey: params.sessionKey,
                 contextTokenBudget: params.contextTokenBudget ?? params.model?.contextWindow,
               }
             : undefined,

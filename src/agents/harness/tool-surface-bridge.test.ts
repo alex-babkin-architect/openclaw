@@ -446,6 +446,35 @@ describe("createAgentHarnessToolSurfaceRuntime", () => {
     runtime.cleanup();
   });
 
+  it.each([true, false])(
+    "resolves lean directory presentation from the session agent (%s)",
+    (lean) => {
+      const runtime = createAgentHarnessToolSurfaceRuntime({
+        config: {
+          agents: {
+            defaults: { experimental: { localModelLean: !lean } },
+            entries: { main: {}, scoped: { experimental: { localModelLean: lean } } },
+          },
+          tools: { codeMode: false, toolSearch: { mode: "tools" } },
+        },
+        sessionKey: "agent:scoped:main",
+        modelToolsEnabled: true,
+      });
+      try {
+        const lookup = Object.assign(createStubTool("fixture_lookup"), {
+          description: "Search the local archive.",
+        });
+        const surface = runtime.compactTools([lookup, createStubTool("browser")]);
+        const prompt = surface.promptToolPolicy.apply().toolSchemaDirectoryPrompt;
+        expect(prompt).toContain("- fixture_lookup (core)");
+        expect(prompt?.includes("Search the local archive.")).toBe(!lean);
+        expect(prompt?.includes("- browser (core)")).toBe(!lean);
+      } finally {
+        runtime.cleanup();
+      }
+    },
+  );
+
   it("keeps exec direct in lean structured Tool Search mode", () => {
     const config: OpenClawConfig = {
       agents: { defaults: { experimental: { localModelLean: true } } },
